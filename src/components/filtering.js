@@ -17,64 +17,6 @@ export function initFiltering(elements, indexes) {
         }
     });
 
-    // Правила для фильтрации
-    const customerRule = () => (key, sourceValue, targetValue) => {
-        if (key !== 'customer') return { continue: true };
-        if (!targetValue) return { skip: true };
-        
-        const sourceStr = String(sourceValue || '').toLowerCase();
-        const targetStr = String(targetValue).toLowerCase();
-        
-        return { result: sourceStr.includes(targetStr) };
-    };
-
-    const sellerRule = () => (key, sourceValue, targetValue) => {
-        if (key !== 'seller') return { continue: true };
-        if (!targetValue) return { skip: true };
-        
-        return { result: String(sourceValue) === String(targetValue) };
-    };
-
-    const totalFromRule = () => (key, sourceValue, targetValue) => {
-        if (key !== 'totalFrom') return { continue: true };
-        if (!targetValue) return { skip: true };
-        
-        const rowTotal = parseFloat(sourceValue) || 0;
-        const filterValue = parseFloat(targetValue) || 0;
-        
-        return { result: rowTotal >= filterValue };
-    };
-
-    const totalToRule = () => (key, sourceValue, targetValue) => {
-        if (key !== 'totalTo') return { continue: true };
-        if (!targetValue) return { skip: true };
-        
-        const rowTotal = parseFloat(sourceValue) || 0;
-        const filterValue = parseFloat(targetValue) || 0;
-        
-        return { result: rowTotal <= filterValue };
-    };
-
-    const dateRule = () => (key, sourceValue, targetValue) => {
-        if (key !== 'date') return { continue: true };
-        if (!targetValue) return { skip: true };
-        
-        const sourceStr = String(sourceValue || '').toLowerCase();
-        const targetStr = String(targetValue).toLowerCase();
-        
-        return { result: sourceStr.includes(targetStr) };
-    };
-
-    const compare = createComparison([
-        'skipEmptyTargetValues'
-    ], [
-        customerRule(),
-        sellerRule(),
-        totalFromRule(),
-        totalToRule(),
-        dateRule()
-    ]);
-
     return (data, state, action) => {
         // @todo: #4.2 — обработать очистку поля
         if (action && action.name === 'clear') {
@@ -89,9 +31,56 @@ export function initFiltering(elements, indexes) {
                     }
                 }
             }
+            // Возвращаем все данные после очистки
+            return data;
         }
 
         // @todo: #4.5 — отфильтровать данные используя компаратор
-        return data.filter(row => compare(row, state));
+        return data.filter(row => {
+            // Фильтр по дате (частичное совпадение)
+            if (state.date && state.date.trim() !== '') {
+                const rowDate = String(row.date || '').toLowerCase();
+                const filterDate = String(state.date).toLowerCase();
+                if (!rowDate.includes(filterDate)) {
+                    return false;
+                }
+            }
+            
+            // Фильтр по клиенту (частичное совпадение)
+            if (state.customer && state.customer.trim() !== '') {
+                const rowCustomer = String(row.customer || '').toLowerCase();
+                const filterCustomer = String(state.customer).toLowerCase();
+                if (!rowCustomer.includes(filterCustomer)) {
+                    return false;
+                }
+            }
+            
+            // Фильтр по продавцу (точное совпадение)
+            if (state.seller && state.seller.trim() !== '') {
+                if (String(row.seller || '') !== String(state.seller)) {
+                    return false;
+                }
+            }
+            
+            // Фильтр по минимальной сумме (totalFrom)
+            if (state.totalFrom && state.totalFrom.trim() !== '') {
+                const rowTotal = parseFloat(row.total) || 0;
+                const filterFrom = parseFloat(state.totalFrom) || 0;
+                if (rowTotal < filterFrom) {
+                    return false;
+                }
+            }
+            
+            // Фильтр по максимальной сумме (totalTo)
+            if (state.totalTo && state.totalTo.trim() !== '') {
+                const rowTotal = parseFloat(row.total) || 0;
+                const filterTo = parseFloat(state.totalTo) || 0;
+                if (rowTotal > filterTo) {
+                    return false;
+                }
+            }
+            
+            return true;
+        });
     }
 }

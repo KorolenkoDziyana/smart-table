@@ -25,7 +25,6 @@ function collectState() {
     // Преобразуем строковые значения в числа для пагинации
     const rowsPerPage = parseInt(state.rowsPerPage) || 10;
     
-    // Важно: page может быть строкой, преобразуем в число
     let page = parseInt(state.page);
     if (isNaN(page) || page < 1) {
         page = 1;
@@ -40,9 +39,6 @@ function collectState() {
 
 /**
  * Обновляет информацию о строках в пагинации
- * @param {Object} state - состояние
- * @param {number} displayedCount - количество отображаемых строк (после пагинации)
- * @param {number} totalFilteredCount - общее количество после фильтрации (до пагинации)
  */
 function updatePaginationInfo(state, displayedCount, totalFilteredCount) {
     if (sampleTable.pagination?.elements) {
