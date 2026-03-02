@@ -1,18 +1,11 @@
-import {createComparison, defaultRules} from "../lib/compare.js";
-
-// @todo: #4.3 — настроить компаратор
-// Используем правила сравнения по умолчанию
-const compare = createComparison(defaultRules);
+import {createComparison, rules} from "../lib/compare.js";
 
 export function initFiltering(elements, indexes) {
     // @todo: #4.1 — заполнить выпадающие списки опциями
     Object.keys(indexes).forEach(elementName => {
-        // Проверяем, существует ли элемент с таким именем
         if (elements[elementName]) {
-            // Получаем массив значений для этого элемента
             const values = Object.values(indexes[elementName]);
             
-            // Создаём опции для каждого значения
             const options = values.map(value => {
                 const option = document.createElement('option');
                 option.value = value;
@@ -20,27 +13,78 @@ export function initFiltering(elements, indexes) {
                 return option;
             });
             
-            // Добавляем опции в select
             elements[elementName].append(...options);
         }
     });
 
+    // Правила для фильтрации
+    const customerRule = () => (key, sourceValue, targetValue) => {
+        if (key !== 'customer') return { continue: true };
+        if (!targetValue) return { skip: true };
+        
+        const sourceStr = String(sourceValue || '').toLowerCase();
+        const targetStr = String(targetValue).toLowerCase();
+        
+        return { result: sourceStr.includes(targetStr) };
+    };
+
+    const sellerRule = () => (key, sourceValue, targetValue) => {
+        if (key !== 'seller') return { continue: true };
+        if (!targetValue) return { skip: true };
+        
+        return { result: String(sourceValue) === String(targetValue) };
+    };
+
+    const totalFromRule = () => (key, sourceValue, targetValue) => {
+        if (key !== 'totalFrom') return { continue: true };
+        if (!targetValue) return { skip: true };
+        
+        const rowTotal = parseFloat(sourceValue) || 0;
+        const filterValue = parseFloat(targetValue) || 0;
+        
+        return { result: rowTotal >= filterValue };
+    };
+
+    const totalToRule = () => (key, sourceValue, targetValue) => {
+        if (key !== 'totalTo') return { continue: true };
+        if (!targetValue) return { skip: true };
+        
+        const rowTotal = parseFloat(sourceValue) || 0;
+        const filterValue = parseFloat(targetValue) || 0;
+        
+        return { result: rowTotal <= filterValue };
+    };
+
+    const dateRule = () => (key, sourceValue, targetValue) => {
+        if (key !== 'date') return { continue: true };
+        if (!targetValue) return { skip: true };
+        
+        const sourceStr = String(sourceValue || '').toLowerCase();
+        const targetStr = String(targetValue).toLowerCase();
+        
+        return { result: sourceStr.includes(targetStr) };
+    };
+
+    const compare = createComparison([
+        'skipEmptyTargetValues'
+    ], [
+        customerRule(),
+        sellerRule(),
+        totalFromRule(),
+        totalToRule(),
+        dateRule()
+    ]);
+
     return (data, state, action) => {
         // @todo: #4.2 — обработать очистку поля
         if (action && action.name === 'clear') {
-            // Находим ближайший родительский элемент с классом 'filter-wrapper'
             const wrapper = action.closest('.filter-wrapper');
             if (wrapper) {
-                // Находим input внутри этого wrapper
                 const input = wrapper.querySelector('input');
                 if (input) {
-                    // Очищаем значение input
                     input.value = '';
-                    
-                    // Получаем имя поля из data-field кнопки
                     const field = action.dataset.field;
                     if (field) {
-                        // Очищаем соответствующее поле в state
                         state[field] = '';
                     }
                 }

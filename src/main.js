@@ -24,7 +24,12 @@ function collectState() {
 
     // Преобразуем строковые значения в числа для пагинации
     const rowsPerPage = parseInt(state.rowsPerPage) || 10;
-    const page = parseInt(state.page) || 1;
+    
+    // Важно: page может быть строкой, преобразуем в число
+    let page = parseInt(state.page);
+    if (isNaN(page) || page < 1) {
+        page = 1;
+    }
 
     return {
         ...state,
@@ -35,21 +40,24 @@ function collectState() {
 
 /**
  * Обновляет информацию о строках в пагинации
+ * @param {Object} state - состояние
+ * @param {number} displayedCount - количество отображаемых строк (после пагинации)
+ * @param {number} totalFilteredCount - общее количество после фильтрации (до пагинации)
  */
-function updatePaginationInfo(state, filteredCount) {
+function updatePaginationInfo(state, displayedCount, totalFilteredCount) {
     if (sampleTable.pagination?.elements) {
         const { fromRow, toRow, totalRows } = sampleTable.pagination.elements;
         
         if (fromRow) {
-            const startRow = (state.page - 1) * state.rowsPerPage + 1;
-            fromRow.textContent = Math.min(startRow, filteredCount);
+            const startRow = totalFilteredCount === 0 ? 0 : (state.page - 1) * state.rowsPerPage + 1;
+            fromRow.textContent = displayedCount === 0 ? 0 : Math.min(startRow, totalFilteredCount);
         }
         if (toRow) {
-            const endRow = Math.min(state.page * state.rowsPerPage, filteredCount);
+            const endRow = Math.min(state.page * state.rowsPerPage, totalFilteredCount);
             toRow.textContent = endRow;
         }
         if (totalRows) {
-            totalRows.textContent = filteredCount;
+            totalRows.textContent = totalFilteredCount;
         }
     }
 }
@@ -65,11 +73,14 @@ function render(action) {
     // Применяем модули в правильном порядке
     result = applySearching(result, state, action);    // 1. Поиск
     result = applyFiltering(result, state, action);    // 2. Фильтрация
+    
+    const totalFilteredCount = result.length; // Сохраняем после фильтрации
+    
     result = applySorting(result, state, action);      // 3. Сортировка
     result = applyPagination(result, state, action);   // 4. Пагинация
 
     sampleTable.render(result);
-    updatePaginationInfo(state, result.length);
+    updatePaginationInfo(state, result.length, totalFilteredCount);
 }
 
 // Инициализация таблицы со всеми шаблонами
