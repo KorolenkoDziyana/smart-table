@@ -12,19 +12,25 @@ import {initSorting} from "./components/sorting.js";
 import {initFiltering} from "./components/filtering.js";
 import {initSearching} from "./components/searching.js";
 
-// Исходные данные используемые в render()
-const {data, ...indexes} = initData(sourceData);
+// main.js — точка входа приложения.
+// Он собирает параметры из формы, делает запрос на сервер и показывает таблицу.
+// Здесь находятся самые важные шаги: сбор состояния, построение query и рендер результата.
+
+// Инициализируем API-слой, который будет делать запросы к серверу.
+const api = initData(sourceData);
 
 /**
- * Сбор и обработка полей из таблицы
+ * Считывает все значения из формы таблицы и приводит некоторые поля к числам.
+ * Возвращает объект состояния, который будет использоваться для сборки query.
  * @returns {Object}
  */
 function collectState() {
     const state = processFormData(new FormData(sampleTable.container));
 
-    // Преобразуем строковые значения в числа для пагинации
+    // В форме rowsPerPage приходит строка, поэтому превращаем её в число.
     const rowsPerPage = parseInt(state.rowsPerPage) || 10;
     
+    // Номер страницы также должен быть числом и не меньше 1.
     let page = parseInt(state.page);
     if (isNaN(page) || page < 1) {
         page = 1;
@@ -38,7 +44,10 @@ function collectState() {
 }
 
 /**
- * Обновляет информацию о строках в пагинации
+ * Обновляет блок пагинации внизу таблицы.
+ * @param {Object} state - состояние формы
+ * @param {number} displayedCount - количество показанных записей на странице
+ * @param {number} totalFilteredCount - общее количество записей после фильтрации
  */
 function updatePaginationInfo(state, displayedCount, totalFilteredCount) {
     if (sampleTable.pagination?.elements) {
@@ -49,8 +58,7 @@ function updatePaginationInfo(state, displayedCount, totalFilteredCount) {
             fromRow.textContent = displayedCount === 0 ? 0 : Math.min(startRow, totalFilteredCount);
         }
         if (toRow) {
-            const endRow = Math.min(state.page * state.rowsPerPage, totalFilteredCount);
-            toRow.textContent = endRow;
+            toRow.textContent = Math.min(state.page * state.rowsPerPage, totalFilteredCount);
         }
         if (totalRows) {
             totalRows.textContent = totalFilteredCount;
@@ -59,27 +67,29 @@ function updatePaginationInfo(state, displayedCount, totalFilteredCount) {
 }
 
 /**
- * Перерисовка состояния таблицы при любых изменениях
- * @param {HTMLButtonElement?} action
+ * Главная функция рендеринга таблицы.
+ * Она строит query, отправляет его на сервер и отображает результат.
+ * @param {HTMLButtonElement?} action - действие пользователя, например кнопка пагинации или сортировки
  */
-function render(action) {
-    let state = collectState();
-    let result = [...data];
-    
-    // Применяем модули в правильном порядке
-    result = applySearching(result, state, action);    // 1. Поиск
-    result = applyFiltering(result, state, action);    // 2. Фильтрация
-    
-    const totalFilteredCount = result.length; // Сохраняем после фильтрации
-    
-    result = applySorting(result, state, action);      // 3. Сортировка
-    result = applyPagination(result, state, action);   // 4. Пагинация
+async function render(action) {
+    let state = collectState(); // собираем данные из формы
+    let query = {}; // сюда будем добавлять параметры запроса поочередно
 
-    sampleTable.render(result);
-    updatePaginationInfo(state, result.length, totalFilteredCount);
+    // Добавление параметров поиска, фильтрации, сортировки и пагинации.
+    query = applySearching(query, state, action);
+    query = applyFiltering(query, state, action);
+    query = applySorting(query, state, action);
+    query = applyPagination(query, state, action);
+
+    // Отправляем query на сервер и получаем готовые записи.
+    const { total, items } = await api.getRecords(query);
+
+    // Перерисовываем элементы пагинации и саму таблицу.
+    updatePagination(total, query);
+    sampleTable.render(items);
 }
 
-// Инициализация таблицы со всеми шаблонами
+// Инициализация таблицы со всеми шаблонами.
 const sampleTable = initTable({
     tableTemplate: 'table',
     rowTemplate: 'row',
@@ -87,10 +97,10 @@ const sampleTable = initTable({
     after: ['pagination']
 }, render);
 
-// Инициализация модулей
+// Инициализация модулей.
 
 // 1. Пагинация
-const applyPagination = initPagination(
+const { applyPagination, updatePagination } = initPagination(
     {
         pages: sampleTable.pagination.elements.pages,
         form: sampleTable.pagination.elements.form,
@@ -103,11 +113,11 @@ const applyPagination = initPagination(
         const span = el.querySelector('span');
         
         if (input) {
-            input.value = page;
-            input.checked = isCurrent;
+            input.value = page; // проставляем номер страницы в кнопке
+            input.checked = isCurrent; // текущая страница отмечается checked
         }
         if (span) {
-            span.textContent = page;
+            span.textContent = page; // текст на кнопке
         }
         
         return el;
@@ -121,19 +131,24 @@ const applySorting = initSorting([
 ]);
 
 // 3. Фильтрация
-const applyFiltering = initFiltering(
-    sampleTable.filter.elements,
-    {
-        searchBySeller: indexes.sellers
-    }
-);
+const { applyFiltering, updateIndexes } = initFiltering(sampleTable.filter.elements);
 
 // 4. Поиск
 const applySearching = initSearching('search');
 
-// Добавляем таблицу на страницу
+// Добавляем контейнер таблицы на страницу.
 const appRoot = document.querySelector('#app');
 appRoot.appendChild(sampleTable.container);
 
-// Первый рендер
-render();
+// Функция инициализации, которая сначала загружает индексы с сервера.
+async function init() {
+    const indexes = await api.getIndexes();
+
+    // После получения индексов заполняем выпадающий список продавцов.
+    updateIndexes(sampleTable.filter.elements, {
+        searchBySeller: indexes.sellers
+    });
+}
+
+// Запускаем первую загрузку и рендер таблицы.
+init().then(render);

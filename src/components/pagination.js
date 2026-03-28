@@ -1,71 +1,77 @@
 import {getPages} from "../lib/utils.js";
 
+// initPagination возвращает две вспомогательные функции: applyPagination и updatePagination.
+// Они нужны, чтобы собирать параметры запроса и потом отрисовывать навигацию по страницам.
 export const initPagination = ({pages, fromRow, toRow, totalRows}, createPage) => {
-    // @todo: #2.3 — подготовить шаблон кнопки для страницы и очистить контейнер
+    // Создаём шаблон кнопки страницы и очищаем контейнер перед заполнением.
     const pageTemplate = pages.firstElementChild.cloneNode(true);
     pages.innerHTML = '';
 
-    return (data, state, action) => {
-        // @todo: #2.1 — посчитать количество страниц, объявить переменные и константы
-        const rowsPerPage = state.rowsPerPage;
-        const totalDataLength = data.length;
-        const pageCount = Math.ceil(totalDataLength / rowsPerPage);
-        
-        // Важно: если данных нет, страниц нет
-        if (totalDataLength === 0) {
-            if (fromRow) fromRow.textContent = '0';
-            if (toRow) toRow.textContent = '0';
-            if (totalRows) totalRows.textContent = '0';
-            pages.innerHTML = '';
-            return [];
-        }
-        
-        let page = state.page;
+    // pageCount хранит общее число страниц после получения данных с сервера.
+    let pageCount;
 
-        // @todo: #2.6 — обработать действия
+    const applyPagination = (query, state, action) => {
+        const limit = state.rowsPerPage; // количество строк на странице
+        let page = state.page; // текущая страница
+
         if (action) {
+            // Если пользователь нажал кнопку пагинации, изменяем номер страницы.
             switch(action.name) {
                 case 'prev':
                     page = Math.max(1, page - 1);
                     break;
                 case 'next':
-                    page = Math.min(pageCount, page + 1);
+                    page = pageCount ? Math.min(pageCount, page + 1) : page + 1;
                     break;
                 case 'first':
                     page = 1;
                     break;
                 case 'last':
-                    page = pageCount;
+                    if (pageCount) {
+                        page = pageCount;
+                    }
                     break;
             }
-            
-            // Обновляем state.page для следующего рендера
+
+            // Сохраняем новый номер страницы обратно в состояние.
             state.page = page;
         }
 
-        // @todo: #2.4 — получить список видимых страниц и вывести их
+        // Возвращаем новый query, не изменяя исходный объект.
+        return Object.assign({}, query, {
+            limit,
+            page
+        });
+    };
+
+    const updatePagination = (total, { page, limit }) => {
+        // Рассчитываем общее количество страниц по общему числу строк и лимиту.
+        pageCount = Math.ceil(total / limit);
+
+        // Получаем список видимых страниц для рендеринга.
         const visiblePages = getPages(page, pageCount, 5);
-        
         const pageButtons = visiblePages.map(pageNumber => {
             const el = pageTemplate.cloneNode(true);
             return createPage(el, pageNumber, pageNumber === page);
         });
-        
+
+        // Обновляем кнопки на странице.
         pages.replaceChildren(...pageButtons);
 
-        // @todo: #2.5 — обновить статус пагинации
+        // Обновляем поля с информацией о диапазоне строк.
         if (fromRow) {
-            fromRow.textContent = (page - 1) * rowsPerPage + 1;
+            fromRow.textContent = (page - 1) * limit + 1;
         }
         if (toRow) {
-            toRow.textContent = Math.min(page * rowsPerPage, totalDataLength);
+            toRow.textContent = Math.min(page * limit, total);
         }
         if (totalRows) {
-            totalRows.textContent = totalDataLength;
+            totalRows.textContent = total;
         }
+    };
 
-        // @todo: #2.2 — посчитать сколько строк нужно пропустить и получить срез данных
-        const skip = (page - 1) * rowsPerPage;
-        return data.slice(skip, skip + rowsPerPage);
-    }
+    return {
+        updatePagination,
+        applyPagination
+    };
 }

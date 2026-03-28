@@ -1,27 +1,26 @@
-import {sortCollection, sortMap} from "../lib/sort.js";
+import {sortMap} from "../lib/sort.js";
 
+// initSorting создаёт функцию, которая добавляет параметр sort в query.
+// sort указывает серверу, по какому полю и в каком направлении сортировать данные.
 export function initSorting(columns) {
-    return (data, state, action) => {
+    return (query, state, action) => {
         let field = null;
         let order = null;
 
         if (action && action.name === 'sort') {
-            // @todo: #3.1 — запомнить выбранный режим сортировки
-            // Переключаем состояние нажатой кнопки по карте переходов
+            // Меняем текущее направление для нажатой колонки.
             action.dataset.value = sortMap[action.dataset.value];
-            
-            // Сохраняем поле и направление сортировки
             field = action.dataset.field;
             order = action.dataset.value;
 
-            // @todo: #3.2 — сбросить сортировки остальных колонок
+            // Сбрасываем сортировку на остальных колонках.
             columns.forEach(column => {
                 if (column.dataset.field !== action.dataset.field) {
                     column.dataset.value = 'none';
                 }
             });
         } else {
-            // @todo: #3.3 — получить выбранный режим сортировки
+            // Если нет действия, ищем активную сортировку в текущем DOM.
             columns.forEach(column => {
                 if (column.dataset.value !== 'none') {
                     field = column.dataset.field;
@@ -30,6 +29,7 @@ export function initSorting(columns) {
             });
         }
 
-        return sortCollection(data, field, order);
+        const sort = (field && order !== 'none') ? `${field}:${order}` : null;
+        return sort ? Object.assign({}, query, { sort }) : query;
     }
 }

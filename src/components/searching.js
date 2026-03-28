@@ -1,22 +1,11 @@
-import {rules, createComparison} from "../lib/compare.js";
-
+// initSearching делает из поля поиска функцию, которая добавляет параметр search в query.
 export function initSearching(searchField) {
-    // Создаём компаратор с правилом поиска по нескольким полям
-    const compare = createComparison([
-        'skipEmptyTargetValues'
-    ], [
-        rules.searchMultipleFields(searchField, ['date', 'customer', 'seller'], false)
-    ]);
-
-    return (data, state, action) => {
-        const searchValue = state[searchField] || '';
-        
-        // Если поиск пустой, возвращаем все данные
-        if (!searchValue) {
-            return data;
-        }
-        
-        // Фильтруем данные
-        return data.filter(row => compare(row, { [searchField]: searchValue }));
+    // searchField — имя поля, в котором пользователь вводит текст для поиска.
+    return (query, state, action) => {
+        // Если в поле есть значение, добавляем параметр search к query.
+        // Если поле пустое, возвращаем query без изменений.
+        return state[searchField] ? Object.assign({}, query, {
+            search: state[searchField]
+        }) : query;
     };
 }
