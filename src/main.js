@@ -72,7 +72,7 @@ function updatePaginationInfo(state, displayedCount, totalFilteredCount) {
  * @param {HTMLButtonElement?} action - действие пользователя, например кнопка пагинации или сортировки
  */
 async function render(action) {
-    let state = collectState(); // собираем данные из формы
+    const state = collectState(); // собираем данные из формы
     let query = {}; // сюда будем добавлять параметры запроса поочередно
 
     // Добавление параметров поиска, фильтрации, сортировки и пагинации.
